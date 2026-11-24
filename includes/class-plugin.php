@@ -27,6 +27,7 @@ final class Plugin {
 	public function run(): void {
 		( new Admin() )->run();
 		( new Database() )->run();
+		( new Preload() )->run();
 
 		if ( ! Settings::is_on( 'enabled' ) ) {
 			return;
@@ -130,5 +131,6 @@ final class Plugin {
 	public static function deactivate(): void {
 		Fonts::purge_files();
 		wp_clear_scheduled_hook( Database::CRON );
+		Preload::deactivate();
 	}
 }

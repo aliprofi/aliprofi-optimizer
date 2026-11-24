@@ -12,6 +12,9 @@ require_once __DIR__ . '/includes/class-fonts.php';
 $aliprofi_optimizer_cleanup = static function () {
 	delete_option( 'aliprofi_optimizer' );
 	\AliProfi\Optimizer\Fonts::purge_files();
+	wp_clear_scheduled_hook( 'aliprofi_optimizer_preload' );
+	delete_transient( 'aliprofi_optimizer_preload_queue' );
+	delete_transient( 'aliprofi_optimizer_preload_lock' );
 };
 
 if ( is_multisite() ) {

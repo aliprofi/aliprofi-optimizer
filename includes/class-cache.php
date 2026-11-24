@@ -207,11 +207,13 @@ final class Cache {
 			}
 		}
 
+		$purged = false;
 		foreach ( $targets as $uri => $target ) {
 			if ( isset( $this->done[ $uri ] ) ) {
 				continue;
 			}
 			$this->done[ $uri ] = true;
+			$purged             = true;
 
 			if ( 'fs' === $settings['purge_method'] || 'both' === $settings['purge_method'] ) {
 				self::purge_file( $target, $settings );
@@ -219,6 +221,10 @@ final class Cache {
 			if ( 'http' === $settings['purge_method'] || 'both' === $settings['purge_method'] ) {
 				self::purge_http( $target, $settings );
 			}
+		}
+
+		if ( $purged ) {
+			do_action( 'aliprofi_optimizer_cache_purged', array_values( array_unique( $urls ) ) );
 		}
 	}
 
@@ -332,6 +338,10 @@ final class Cache {
 			}
 		}
 
+		if ( $tried && $ok ) {
+			do_action( 'aliprofi_optimizer_cache_purged', array( $url ) );
+		}
+
 		return $tried && $ok;
 	}
 
@@ -432,7 +442,12 @@ final class Cache {
 			$ok    = self::purge_all_http( (string) $settings['purge_endpoint'] ) || $ok;
 		}
 
-		return $tried && $ok;
+		$result = $tried && $ok;
+		if ( $result ) {
+			do_action( 'aliprofi_optimizer_cache_purged_all' );
+		}
+
+		return $result;
 	}
 
 	/**

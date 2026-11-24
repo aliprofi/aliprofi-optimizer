@@ -40,6 +40,10 @@ final class Settings {
 			'cache_key'           => '{scheme}{method}{host}{uri}',
 			'purge_endpoint'      => '',
 			'purge_on_menu'       => 1,
+			'preload'             => 1,
+			'preload_full'        => 0,
+			'preload_batch'       => 3,
+			'preload_limit'       => 30,
 			'delay'               => 1,
 			'delay_exclusions'    => "jquery\njquery-migrate",
 			'delay_safe_mode'     => 0,
@@ -142,6 +146,8 @@ final class Settings {
 			'enabled',
 			'purge',
 			'purge_on_menu',
+			'preload',
+			'preload_full',
 			'delay',
 			'delay_safe_mode',
 			'defer',
@@ -197,6 +203,12 @@ final class Settings {
 			}
 		}
 		$out['purge_endpoint'] = $endpoint;
+
+		$batch                = isset( $in['preload_batch'] ) ? absint( $in['preload_batch'] ) : 0;
+		$out['preload_batch'] = max( 1, min( 5, $batch ? $batch : (int) $defaults['preload_batch'] ) );
+
+		$limit                = isset( $in['preload_limit'] ) ? absint( $in['preload_limit'] ) : 0;
+		$out['preload_limit'] = max( 5, min( 200, $limit ? $limit : (int) $defaults['preload_limit'] ) );
 
 		$out['delay_exclusions'] = self::lines( $in['delay_exclusions'] ?? '', 300 );
 		$out['defer_exclude']    = self::lines( $in['defer_exclude'] ?? '', 200 );

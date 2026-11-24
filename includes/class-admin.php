@@ -130,6 +130,28 @@ final class Admin {
 							<a class="button oro-btn oro-btn-danger" href="<?php echo esc_url( $this->action_url( 'aliprofi_optimizer_purge_all' ) ); ?>" onclick="return confirm('Очистить весь кэш OpenResty?');">Очистить весь кэш</a>
 						</div>
 					<?php self::card_close(); ?>
+
+					<?php self::card_open( 'Предзагрузка кэша', 'После сброса страницы ставятся в очередь и запрашиваются в фоне по WP-Cron. Это сокращает ожидание первого посетителя, но добавляет нагрузку на PHP-FPM.' ); ?>
+						<?php
+						self::toggle( 'preload', 'Прогревать кэш после сброса', 'Очищенные страницы ставятся в очередь. Запросы идут без cookies, поэтому попадают в кэш как гость.' );
+						self::toggle( 'preload_full', 'При полной очистке брать последние изменённые записи', 'Главная и свежие материалы — до лимита очереди. Весь сайт не обходится.' );
+						self::number_field( 'preload_batch', 'URL за один запуск', '1–5. Больше — быстрее, но выше нагрузка на PHP-FPM.', 1, 5, 1 );
+						self::number_field( 'preload_limit', 'Максимум URL в очереди', '5–200. Новые URL вытесняют старые.', 5, 200, 5 );
+						$queued = Preload::queue_count();
+						?>
+						<div class="oro-note">
+							<?php
+							echo esc_html(
+								$queued > 0
+									? sprintf( 'Сейчас в очереди: %d URL. Прогрев идёт порциями по WP-Cron.', $queued )
+									: 'Очередь пуста. Для прогрева должен работать WP-Cron.'
+							);
+							?>
+						</div>
+						<div class="oro-actions">
+							<button type="submit" class="button button-primary oro-btn">Сохранить изменения</button>
+						</div>
+					<?php self::card_close(); ?>
 				</section>
 
 				<section class="oro-panel" data-panel="js">
@@ -1104,11 +1126,11 @@ final class Admin {
 
 		switch ( $key ) {
 			case 'purged':
-				return array( 'success', 'Кэш OpenResty очищен.' );
+				return array( 'success', 'Кэш OpenResty очищен.' . $this->preload_note() );
 			case 'purge_failed':
 				return array( 'error', 'Не удалось очистить кэш. Проверьте путь, права и настройки PURGE.' );
 			case 'page_purged':
-				return array( 'success', 'Кэш этой страницы очищен.' );
+				return array( 'success', 'Кэш этой страницы очищен.' . $this->preload_note() );
 			case 'page_purge_failed':
 				return array( 'error', 'Не удалось очистить кэш этой страницы. Проверьте настройки сброса.' );
 			case 'fonts_cleared':
@@ -1124,6 +1146,13 @@ final class Admin {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Пометка о фоновом прогреве для уведомлений.
+	 */
+	private function preload_note(): string {
+		return Preload::is_enabled() ? ' Прогрев кэша запущен в фоне.' : '';
 	}
 
 	/**
