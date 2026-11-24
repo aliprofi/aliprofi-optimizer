@@ -525,11 +525,14 @@ final class Admin {
 			.oro-status {
 				display: inline-flex;
 				align-items: center;
+				flex-wrap: wrap;
 				gap: 6px;
+				max-width: 100%;
 				padding: 2px 9px;
 				border-radius: 999px;
 				font-size: 11.5px;
 				font-weight: 600;
+				overflow-wrap: anywhere;
 			}
 			.oro-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 			.oro-status--ok { background: #dcfce7; color: var(--oro-ok); }

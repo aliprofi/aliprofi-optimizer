@@ -651,7 +651,23 @@ final class Page_Cache {
 			return array( 'warn', 'Drop-in advanced-cache.php ещё не установлен. Откройте эту страницу в админке.' );
 		}
 		if ( ! ( defined( 'WP_CACHE' ) && WP_CACHE ) && ! self::$wp_cache_written ) {
-			return array( 'warn', 'WP_CACHE не включён в wp-config.php. Добавьте define( \'WP_CACHE\', true );' );
+			if ( defined( 'WP_CACHE' ) && ! WP_CACHE ) {
+				return array( 'warn', 'В wp-config.php указано WP_CACHE = false. Замените на define( \'WP_CACHE\', true );' );
+			}
+
+			$config = self::wp_config_path();
+			if ( '' === $config ) {
+				return array( 'warn', 'WP_CACHE не включён. Добавьте define( \'WP_CACHE\', true ); в wp-config.php.' );
+			}
+			$contents = @file_get_contents( $config ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			if ( is_string( $contents ) && str_contains( $contents, 'WP_CACHE' ) ) {
+				return array( 'warn', 'В ' . $config . ' уже упоминается WP_CACHE, но константа не определена. Проверьте строку define( \'WP_CACHE\', true );' );
+			}
+			if ( ! is_writable( $config ) ) {
+				return array( 'warn', 'WP_CACHE не включён. Добавьте define( \'WP_CACHE\', true ); в ' . $config . ' — файл недоступен для записи PHP.' );
+			}
+
+			return array( 'warn', 'WP_CACHE не включён. Откройте настройки ещё раз для автоправки ' . $config . ' или добавьте define( \'WP_CACHE\', true ); вручную.' );
 		}
 
 		return array( 'ok', 'Кэш страниц работает: HTML хранится в wp-content/cache/aliprofi-optimizer/pages.' );
@@ -793,7 +809,7 @@ final class Page_Cache {
 		}
 
 		$file = self::wp_config_path();
-		if ( '' === $file ) {
+		if ( '' === $file || ! is_readable( $file ) || ! is_writable( $file ) ) {
 			return false;
 		}
 
@@ -847,13 +863,20 @@ final class Page_Cache {
 			dirname( rtrim( ABSPATH, '/\\' ) ) . '/wp-config.php',
 		);
 
+		$fallback = '';
 		foreach ( $candidates as $candidate ) {
-			if ( is_file( $candidate ) && is_readable( $candidate ) && is_writable( $candidate ) ) {
+			if ( ! is_file( $candidate ) ) {
+				continue;
+			}
+			if ( is_readable( $candidate ) ) {
 				return $candidate;
+			}
+			if ( '' === $fallback ) {
+				$fallback = $candidate;
 			}
 		}
 
-		return '';
+		return $fallback;
 	}
 
 	/**
