@@ -53,6 +53,9 @@ final class Settings {
 			'delay_timeout'       => 7000,
 			'defer'               => 1,
 			'defer_exclude'       => "jquery-core\njquery",
+			'css_async'           => 0,
+			'css_async_exclude'   => "admin-bar\ndashicons",
+			'dequeue_mediaelement' => 0,
 			'clean_emoji'         => 1,
 			'clean_embed'         => 1,
 			'clean_meta'          => 1,
@@ -155,6 +158,8 @@ final class Settings {
 			'delay',
 			'delay_safe_mode',
 			'defer',
+			'css_async',
+			'dequeue_mediaelement',
 			'clean_emoji',
 			'clean_embed',
 			'clean_meta',
@@ -218,9 +223,10 @@ final class Settings {
 		$out['page_cache_ttl']  = max( 1, min( 168, $ttl ? $ttl : (int) $defaults['page_cache_ttl'] ) );
 		$out['page_cache_exclude'] = self::lines( $in['page_cache_exclude'] ?? '', 100 );
 
-		$out['delay_exclusions'] = self::lines( $in['delay_exclusions'] ?? '', 300 );
-		$out['defer_exclude']    = self::lines( $in['defer_exclude'] ?? '', 200 );
-		$out['lazy_exclude']     = self::lines( $in['lazy_exclude'] ?? '', 200 );
+		$out['delay_exclusions']  = self::lines( $in['delay_exclusions'] ?? '', 300 );
+		$out['defer_exclude']     = self::lines( $in['defer_exclude'] ?? '', 200 );
+		$out['css_async_exclude'] = self::lines( $in['css_async_exclude'] ?? '', 200 );
+		$out['lazy_exclude']      = self::lines( $in['lazy_exclude'] ?? '', 200 );
 
 		$timeout              = isset( $in['delay_timeout'] ) ? absint( $in['delay_timeout'] ) : 0;
 		$out['delay_timeout'] = min( 60000, $timeout );

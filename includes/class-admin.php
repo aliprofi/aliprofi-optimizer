@@ -201,6 +201,18 @@ final class Admin {
 							<button type="submit" class="button button-primary oro-btn">Сохранить изменения</button>
 						</div>
 					<?php self::card_close(); ?>
+
+					<?php self::card_open( 'CSS и MediaElement', 'Асинхронный CSS убирает блокировку отрисовки, а отключение MediaElement — лишние стили и скрипты плеера.' ); ?>
+						<?php
+						self::toggle( 'css_async', 'Загружать CSS асинхронно', 'Стили подключаются через preload + onload и не блокируют первую отрисовку. Может вызвать мигание вёрстки и не сработать при строгом CSP — проверьте на мобильном.' );
+						self::textarea_field( 'css_async_exclude', 'Исключения асинхронного CSS', 'Handle или фрагмент URL, по одному на строку. Например, <code>reboot-style</code>, чтобы главный стиль темы оставался блокирующим. По умолчанию исключены admin-bar и dashicons.' );
+						self::toggle( 'dequeue_mediaelement', 'Не подключать MediaElement', 'Убирает стили и скрипты плеера WordPress. Включайте только если на сайте нет аудио и видео, иначе плееры перестанут работать.' );
+						?>
+						<div class="oro-note">Асинхронный CSS и отключение MediaElement применяются только к гостевому фронтенду. После включения проверьте главную, запись с медиа и мобильную версию.</div>
+						<div class="oro-actions">
+							<button type="submit" class="button button-primary oro-btn">Сохранить изменения</button>
+						</div>
+					<?php self::card_close(); ?>
 				</section>
 
 				<section class="oro-panel" data-panel="media">

@@ -3,7 +3,7 @@
  * Plugin Name: Aliprofi Optimizer
  * Plugin URI:  https://aliprofi.ru
  * Description: Лёгкая оптимизация фронтенда (JS, изображения, YouTube, шрифты), собственный страничный кэш, очистка базы данных, сброс и прогрев FastCGI-кэша OpenResty.
- * Version:     1.4.1
+ * Version:     1.4.2
  * Requires at least: 6.4
  * Requires PHP: 8.1
  * Author:      Али Профи
@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 define( 'ALIPROFI_OPTIMIZER_FILE', __FILE__ );
 define( 'ALIPROFI_OPTIMIZER_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ALIPROFI_OPTIMIZER_URL', plugin_dir_url( __FILE__ ) );
-define( 'ALIPROFI_OPTIMIZER_VERSION', '1.4.1' );
+define( 'ALIPROFI_OPTIMIZER_VERSION', '1.4.2' );
 
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-settings.php';
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-cache.php';

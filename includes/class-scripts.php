@@ -22,6 +22,13 @@ final class Scripts {
 	private array $exclude = array();
 
 	/**
+	 * Исключения асинхронного CSS.
+	 *
+	 * @var string[]
+	 */
+	private array $css_exclude = array();
+
+	/**
 	 * Подключение модуля.
 	 */
 	public function run(): void {
@@ -34,6 +41,21 @@ final class Scripts {
 				}
 			}
 			add_filter( 'script_loader_tag', array( $this, 'defer' ), 10, 3 );
+		}
+
+		if ( Settings::is_on( 'css_async' ) ) {
+			$lines = preg_split( '/\r\n|\r|\n/', (string) Settings::get( 'css_async_exclude' ) );
+			foreach ( $lines as $line ) {
+				$line = strtolower( trim( $line ) );
+				if ( '' !== $line ) {
+					$this->css_exclude[] = $line;
+				}
+			}
+			add_filter( 'style_loader_tag', array( $this, 'async_style' ), 10, 4 );
+		}
+
+		if ( Settings::is_on( 'dequeue_mediaelement' ) ) {
+			add_action( 'wp_enqueue_scripts', array( $this, 'dequeue_mediaelement' ), 999 );
 		}
 
 		if ( Settings::is_on( 'clean_emoji' ) ) {
@@ -79,6 +101,62 @@ final class Scripts {
 		}
 
 		return (string) preg_replace( '/<script\b/i', '<script defer', $tag, 1 );
+	}
+
+	/**
+	 * Асинхронная загрузка стилей через preload + onload.
+	 *
+	 * @param string $tag    HTML тега.
+	 * @param string $handle Handle стиля.
+	 * @param string $href   URL стиля.
+	 * @param string $media  Медиа-запрос.
+	 */
+	public function async_style( $tag, $handle, $href, $media ): string {
+		$tag = (string) $tag;
+		if ( '' === $tag || ! is_string( $href ) || '' === $href ) {
+			return $tag;
+		}
+		if ( false !== stripos( $tag, "rel='preload'" ) || false !== stripos( $tag, 'rel="preload"' ) || false !== stripos( $tag, 'data-no-async' ) ) {
+			return $tag;
+		}
+		if ( ! preg_match( '/\brel=([\'"])stylesheet\1/i', $tag ) ) {
+			return $tag;
+		}
+		if ( is_string( $media ) && str_contains( strtolower( $media ), 'print' ) ) {
+			return $tag;
+		}
+
+		$handle = strtolower( (string) $handle );
+		$href   = strtolower( (string) $href );
+		foreach ( $this->css_exclude as $needle ) {
+			if ( str_contains( $handle, $needle ) || str_contains( $href, $needle ) ) {
+				return $tag;
+			}
+		}
+
+		$async = str_replace(
+			array( "rel='stylesheet'", 'rel="stylesheet"' ),
+			array(
+				"rel='preload' as='style' onload=\"this.onload=null;this.rel='stylesheet'\"",
+				'rel="preload" as="style" onload="this.onload=null;this.rel=\'stylesheet\'"',
+			),
+			$tag
+		);
+		if ( $async === $tag ) {
+			return $tag;
+		}
+
+		return $async . '<noscript>' . $tag . '</noscript>';
+	}
+
+	/**
+	 * Отключение стилей и скриптов MediaElement.
+	 */
+	public function dequeue_mediaelement(): void {
+		foreach ( array( 'mediaelement', 'wp-mediaelement', 'mediaelementplayer', 'mediaelementplayer-legacy' ) as $handle ) {
+			wp_dequeue_style( $handle );
+			wp_dequeue_script( $handle );
+		}
 	}
 
 	/**
