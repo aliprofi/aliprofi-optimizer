@@ -1,15 +1,19 @@
 <?php
 /**
- * Удаление плагина: опция и локальный кэш шрифтов. Кэш OpenResty не затрагивается.
+ * Удаление плагина: опция, собственный страничный кэш с drop-in и локальный кэш шрифтов.
+ * Кэш OpenResty не затрагивается.
  *
  * @package Aliprofi_Optimizer
  */
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
+require_once __DIR__ . '/includes/class-settings.php';
 require_once __DIR__ . '/includes/class-fonts.php';
+require_once __DIR__ . '/includes/class-page-cache.php';
 
 $aliprofi_optimizer_cleanup = static function () {
+	\AliProfi\Optimizer\Page_Cache::uninstall();
 	delete_option( 'aliprofi_optimizer' );
 	\AliProfi\Optimizer\Fonts::purge_files();
 	wp_clear_scheduled_hook( 'aliprofi_optimizer_preload' );

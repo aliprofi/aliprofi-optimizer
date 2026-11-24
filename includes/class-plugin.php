@@ -28,6 +28,7 @@ final class Plugin {
 		( new Admin() )->run();
 		( new Database() )->run();
 		( new Preload() )->run();
+		( new Page_Cache() )->run();
 
 		if ( ! Settings::is_on( 'enabled' ) ) {
 			return;
@@ -123,6 +124,8 @@ final class Plugin {
 		if ( false === get_option( Settings::OPTION, false ) ) {
 			add_option( Settings::OPTION, Settings::defaults(), '', 'yes' );
 		}
+
+		Page_Cache::activate();
 	}
 
 	/**
@@ -132,5 +135,6 @@ final class Plugin {
 		Fonts::purge_files();
 		wp_clear_scheduled_hook( Database::CRON );
 		Preload::deactivate();
+		Page_Cache::deactivate();
 	}
 }

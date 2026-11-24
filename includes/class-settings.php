@@ -44,6 +44,9 @@ final class Settings {
 			'preload_full'        => 0,
 			'preload_batch'       => 3,
 			'preload_limit'       => 30,
+			'page_cache'          => 1,
+			'page_cache_ttl'      => 12,
+			'page_cache_exclude'  => '',
 			'delay'               => 1,
 			'delay_exclusions'    => "jquery\njquery-migrate",
 			'delay_safe_mode'     => 0,
@@ -148,6 +151,7 @@ final class Settings {
 			'purge_on_menu',
 			'preload',
 			'preload_full',
+			'page_cache',
 			'delay',
 			'delay_safe_mode',
 			'defer',
@@ -209,6 +213,10 @@ final class Settings {
 
 		$limit                = isset( $in['preload_limit'] ) ? absint( $in['preload_limit'] ) : 0;
 		$out['preload_limit'] = max( 5, min( 200, $limit ? $limit : (int) $defaults['preload_limit'] ) );
+
+		$ttl                    = isset( $in['page_cache_ttl'] ) ? absint( $in['page_cache_ttl'] ) : 0;
+		$out['page_cache_ttl']  = max( 1, min( 168, $ttl ? $ttl : (int) $defaults['page_cache_ttl'] ) );
+		$out['page_cache_exclude'] = self::lines( $in['page_cache_exclude'] ?? '', 100 );
 
 		$out['delay_exclusions'] = self::lines( $in['delay_exclusions'] ?? '', 300 );
 		$out['defer_exclude']    = self::lines( $in['defer_exclude'] ?? '', 200 );

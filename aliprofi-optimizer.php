@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Aliprofi Optimizer
  * Plugin URI:  https://aliprofi.ru
- * Description: Лёгкая оптимизация фронтенда (JS, изображения, YouTube, шрифты), очистка базы данных, сброс и предзагрузка FastCGI-кэша OpenResty.
- * Version:     1.3.0
+ * Description: Лёгкая оптимизация фронтенда (JS, изображения, YouTube, шрифты), собственный страничный кэш, очистка базы данных, сброс и прогрев FastCGI-кэша OpenResty.
+ * Version:     1.4.0
  * Requires at least: 6.4
  * Requires PHP: 8.1
  * Author:      Али Профи
@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
 define( 'ALIPROFI_OPTIMIZER_FILE', __FILE__ );
 define( 'ALIPROFI_OPTIMIZER_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ALIPROFI_OPTIMIZER_URL', plugin_dir_url( __FILE__ ) );
-define( 'ALIPROFI_OPTIMIZER_VERSION', '1.3.0' );
+define( 'ALIPROFI_OPTIMIZER_VERSION', '1.4.0' );
 
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-settings.php';
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-cache.php';
@@ -33,6 +33,7 @@ require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-images.php';
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-youtube.php';
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-fonts.php';
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-preload.php';
+require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-page-cache.php';
 require_once ALIPROFI_OPTIMIZER_DIR . 'includes/class-plugin.php';
 
 register_activation_hook( __FILE__, array( Plugin::class, 'activate' ) );

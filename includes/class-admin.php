@@ -23,6 +23,7 @@ final class Admin {
 		add_action( 'admin_bar_menu', array( $this, 'bar' ), 100 );
 		add_action( 'admin_post_aliprofi_optimizer_purge_all', array( $this, 'handle_purge_all' ) );
 		add_action( 'admin_post_aliprofi_optimizer_purge_page', array( $this, 'handle_purge_page' ) );
+		add_action( 'admin_post_aliprofi_optimizer_purge_pages', array( $this, 'handle_purge_pages' ) );
 		add_action( 'admin_post_aliprofi_optimizer_clear_fonts', array( $this, 'handle_clear_fonts' ) );
 		add_action( 'admin_post_aliprofi_optimizer_db_cleanup', array( $this, 'handle_db_cleanup' ) );
 		add_action( 'admin_notices', array( $this, 'notice' ) );
@@ -68,7 +69,7 @@ final class Admin {
 					<span class="oro-hero__logo dashicons dashicons-performance" aria-hidden="true"></span>
 					<div>
 						<h1>Aliprofi Optimizer</h1>
-						<p>Оптимизация фронтенда и кэша OpenResty</p>
+						<p>Оптимизация фронтенда, страничный кэш и кэш OpenResty</p>
 					</div>
 				</div>
 				<div class="oro-hero__side">
@@ -150,6 +151,26 @@ final class Admin {
 						</div>
 						<div class="oro-actions">
 							<button type="submit" class="button button-primary oro-btn">Сохранить изменения</button>
+						</div>
+					<?php self::card_close(); ?>
+
+					<?php self::card_open( 'Страничный кэш в wp-content', 'Готовый HTML хранится в <code>wp-content/cache/aliprofi-optimizer/pages</code> и отдаётся ещё до загрузки WordPress. Это рабочий вариант для шаред-хостинга, где каталог Nginx недоступен из PHP.' ); ?>
+						<?php
+						self::toggle( 'page_cache', 'Включить страничный кэш', 'Кэшируются только гостевые GET-запросы без query. Авторизованные, корзина, предпросмотр, 404 и служебные URL пропускаются.' );
+						$page_state = Page_Cache::status();
+						$page_tone  = in_array( $page_state[0], array( 'ok', 'warn', 'bad' ), true ) ? $page_state[0] : 'warn';
+						?>
+						<div class="oro-field"><span class="oro-status oro-status--<?php echo esc_attr( $page_tone ); ?>"><?php echo esc_html( $page_state[1] ); ?></span></div>
+						<?php
+						self::number_field( 'page_cache_ttl', 'Время жизни, часов', '1–168. После истечения страница удаляется и собирается заново.', 1, 168, 1 );
+						self::textarea_field( 'page_cache_exclude', 'Исключения по пути', 'По одному фрагменту на строку, например <code>/cart</code>, <code>/checkout</code>, <code>/my-account</code>. Совпадение по подстроке.' );
+						?>
+						<div class="oro-note">
+							Плагин создаёт <code>advanced-cache.php</code> и при необходимости добавляет <code>define( 'WP_CACHE', true );</code> в <code>wp-config.php</code>. Чужой <code>advanced-cache.php</code> не перезаписывается: сначала отключите другой плагин кэширования.
+						</div>
+						<div class="oro-actions">
+							<button type="submit" class="button button-primary oro-btn">Сохранить изменения</button>
+							<a class="button oro-btn" href="<?php echo esc_url( $this->action_url( 'aliprofi_optimizer_purge_pages' ) ); ?>" onclick="return confirm('Очистить кэш страниц в wp-content/cache?');">Очистить кэш страниц</a>
 						</div>
 					<?php self::card_close(); ?>
 				</section>
@@ -921,7 +942,18 @@ final class Admin {
 			return;
 		}
 
-		$this->redirect_to_url( $url, Cache::purge_url( $url ) ? 'page_purged' : 'page_purge_failed' );
+		$cache_ok = Cache::purge_url( $url );
+		$pages_on = Settings::is_on( 'page_cache' ) && ! is_multisite();
+		$pages_ok = false;
+		if ( $pages_on ) {
+			$pages_ok = true;
+			Page_Cache::purge_urls( array( $url ) );
+			if ( ! $cache_ok ) {
+				do_action( 'aliprofi_optimizer_cache_purged', array( $url ) );
+			}
+		}
+
+		$this->redirect_to_url( $url, $cache_ok || $pages_ok ? 'page_purged' : 'page_purge_failed' );
 	}
 
 	/**
@@ -929,7 +961,24 @@ final class Admin {
 	 */
 	public function handle_purge_all(): void {
 		$this->guard( 'aliprofi_optimizer_purge_all' );
-		$this->redirect_back( Cache::purge_all() ? 'purged' : 'purge_failed' );
+
+		$cache_ok = Cache::purge_all();
+		$pages_on = Settings::is_on( 'page_cache' ) && ! is_multisite();
+		$pages_ok = $pages_on ? Page_Cache::purge_all() : true;
+
+		if ( $pages_on && ! $cache_ok ) {
+			do_action( 'aliprofi_optimizer_cache_purged_all' );
+		}
+
+		$this->redirect_back( $cache_ok || $pages_ok ? 'purged' : 'purge_failed' );
+	}
+
+	/**
+	 * Обработчик очистки собственного страничного кэша.
+	 */
+	public function handle_purge_pages(): void {
+		$this->guard( 'aliprofi_optimizer_purge_pages' );
+		$this->redirect_back( Page_Cache::purge_all() ? 'pages_cleared' : 'pages_clear_failed' );
 	}
 
 	/**
@@ -1126,13 +1175,17 @@ final class Admin {
 
 		switch ( $key ) {
 			case 'purged':
-				return array( 'success', 'Кэш OpenResty очищен.' . $this->preload_note() );
+				return array( 'success', 'Кэш очищен.' . $this->preload_note() );
 			case 'purge_failed':
 				return array( 'error', 'Не удалось очистить кэш. Проверьте путь, права и настройки PURGE.' );
 			case 'page_purged':
 				return array( 'success', 'Кэш этой страницы очищен.' . $this->preload_note() );
 			case 'page_purge_failed':
 				return array( 'error', 'Не удалось очистить кэш этой страницы. Проверьте настройки сброса.' );
+			case 'pages_cleared':
+				return array( 'success', 'Страничный кэш в wp-content/cache очищен.' );
+			case 'pages_clear_failed':
+				return array( 'error', 'Не удалось очистить страничный кэш. Проверьте права на wp-content/cache.' );
 			case 'fonts_cleared':
 				return array( 'success', 'Локальный кэш шрифтов очищен.' );
 			case 'fonts_failed':

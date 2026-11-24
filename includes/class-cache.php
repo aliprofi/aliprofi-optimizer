@@ -141,6 +141,16 @@ final class Cache {
 			return;
 		}
 
+		$this->purge_urls( self::urls_for_post( $post ) );
+	}
+
+	/**
+	 * URL, которые выводят данные записи: сама запись, главная, архив, автор, рубрики, метки.
+	 *
+	 * @param \WP_Post $post Запись.
+	 * @return string[]
+	 */
+	public static function urls_for_post( \WP_Post $post ): array {
 		$urls = array( home_url( '/' ) );
 
 		$permalink = get_permalink( $post );
@@ -186,7 +196,7 @@ final class Cache {
 			}
 		}
 
-		$this->purge_urls( array_unique( $urls ) );
+		return array_values( array_unique( array_filter( $urls, 'is_string' ) ) );
 	}
 
 	/**
