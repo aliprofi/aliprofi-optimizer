@@ -29,6 +29,8 @@ final class Admin {
 		add_action( 'admin_notices', array( $this, 'notice' ) );
 		add_action( 'wp_footer', array( $this, 'toast' ), 100 );
 		add_filter( 'plugin_action_links_' . plugin_basename( ALIPROFI_OPTIMIZER_FILE ), array( $this, 'links' ) );
+
+		( new PageSpeed() )->run();
 	}
 
 	/**
@@ -92,6 +94,7 @@ final class Admin {
 				self::tab_button( 'media', 'Медиа', 'dashicons-format-image' );
 				self::tab_button( 'database', 'База данных', 'dashicons-database' );
 				self::tab_button( 'fonts', 'Шрифты', 'dashicons-editor-textcolor' );
+				self::tab_button( 'pagespeed', 'PageSpeed & AI', 'dashicons-dashboard' );
 				?>
 			</nav>
 
@@ -305,6 +308,8 @@ final class Admin {
 					</div>
 				</section>
 			</form>
+
+			<?php $this->render_pagespeed_panel(); ?>
 
 			<footer class="oro-credit">
 				Aliprofi Optimizer <?php echo esc_html( ALIPROFI_OPTIMIZER_VERSION ); ?> ·
@@ -1268,5 +1273,252 @@ final class Admin {
 			add_query_arg( 'action', $action, admin_url( 'admin-post.php' ) ),
 			$action
 		);
+	}
+
+	/**
+	 * Вкладка PageSpeed Insights + AI-разбор (DeepSeek).
+	 */
+	private function render_pagespeed_panel(): void {
+		$psi_key      = (string) get_option( PageSpeed::OPT_PSI_KEY, '' );
+		$deepseek_key = (string) get_option( PageSpeed::OPT_DEEPSEEK_KEY, '' );
+		$history      = get_option( PageSpeed::OPT_HISTORY, array() );
+		if ( ! is_array( $history ) ) {
+			$history = array();
+		}
+		$latest = $history[0] ?? null;
+		$nonce  = wp_create_nonce( PageSpeed::NONCE_ACTION );
+		?>
+		<div class="oro-form" data-form="pagespeed" style="display:none;">
+			<section class="oro-panel" data-panel="pagespeed">
+				<?php self::card_open( 'API-ключи', 'Ключи хранятся в базе данных с autoload=no. Google PSI API бесплатен (до 25 000 запросов/сутки). DeepSeek используется только по кнопке AI-разбора.' ); ?>
+					<div class="oro-field">
+						<label class="oro-field__label" for="oro-psi-key">Google PageSpeed API Key</label>
+						<div class="oro-field__control">
+							<input type="password" id="oro-psi-key" class="regular-text" value="<?php echo esc_attr( $psi_key ); ?>" placeholder="AIzaSy..." autocomplete="off">
+							<p class="description">Опционально, но с ключом Google не режет запросы по лимиту IP.</p>
+						</div>
+					</div>
+					<div class="oro-field">
+						<label class="oro-field__label" for="oro-deepseek-key">DeepSeek API Key</label>
+						<div class="oro-field__control">
+							<input type="password" id="oro-deepseek-key" class="regular-text" value="<?php echo esc_attr( $deepseek_key ); ?>" placeholder="sk-..." autocomplete="off">
+							<p class="description">Нужен только для кнопки «AI-разбор через DeepSeek».</p>
+						</div>
+					</div>
+					<div class="oro-actions">
+						<button type="button" id="oro-psi-save-keys" class="button oro-btn">Сохранить ключи</button>
+						<span id="oro-psi-keys-status" class="description" style="align-self:center;"></span>
+					</div>
+				<?php self::card_close(); ?>
+
+				<?php self::card_open( 'Замер скорости страницы', 'Проверка через Google PageSpeed Insights v5 с привязкой проблемных ресурсов к плагинам и настройкам Aliprofi Optimizer.' ); ?>
+					<div class="oro-field">
+						<label class="oro-field__label" for="oro-psi-url">URL страницы</label>
+						<div class="oro-field__control">
+							<input type="url" id="oro-psi-url" class="regular-text" style="width:100%;max-width:520px;" value="<?php echo esc_attr( home_url( '/' ) ); ?>">
+						</div>
+					</div>
+					<div class="oro-field">
+						<label class="oro-field__label" for="oro-psi-strategy">Устройство</label>
+						<div class="oro-field__control">
+							<select id="oro-psi-strategy">
+								<option value="mobile">Мобильные (Mobile)</option>
+								<option value="desktop">Компьютер (Desktop)</option>
+							</select>
+						</div>
+					</div>
+					<div class="oro-actions">
+						<button type="button" id="oro-psi-run" class="button button-primary oro-btn">Запустить тест PageSpeed</button>
+						<button type="button" id="oro-psi-ai-btn" class="button oro-btn" <?php echo empty( $latest ) ? 'disabled' : ''; ?>>AI-разбор через DeepSeek</button>
+						<?php if ( ! empty( $history ) ) : ?>
+							<button type="button" id="oro-psi-clear-history" class="button oro-btn oro-btn-danger">Очистить историю</button>
+						<?php endif; ?>
+						<span id="oro-psi-status" class="description" style="align-self:center;"></span>
+					</div>
+				<?php self::card_close(); ?>
+
+				<div id="oro-psi-results"></div>
+				<div id="oro-psi-ai-box" style="display:none;">
+					<?php self::card_open( 'Рекомендации DeepSeek AI', 'Конкретные изменения настроек Aliprofi Optimizer и ТЗ для программиста.' ); ?>
+						<pre id="oro-psi-ai-output" style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.6;margin:0;"></pre>
+					<?php self::card_close(); ?>
+				</div>
+
+				<?php if ( ! empty( $history ) ) : ?>
+					<?php self::card_open( 'История замеров (последние ' . count( $history ) . ')', 'Сравнение показателей «До / После».' ); ?>
+						<table class="widefat striped">
+							<thead>
+								<tr>
+									<th>Дата</th>
+									<th>URL</th>
+									<th>Устройство</th>
+									<th>Балл</th>
+									<th>LCP</th>
+									<th>TBT</th>
+									<th>CLS</th>
+									<th>TTFB</th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php foreach ( $history as $row ) : ?>
+									<tr>
+										<td><?php echo esc_html( $row['timestamp'] ?? '' ); ?></td>
+										<td><?php echo esc_html( $row['url'] ?? '' ); ?></td>
+										<td><?php echo esc_html( $row['strategy'] ?? '' ); ?></td>
+										<td><strong><?php echo (int) ( $row['metrics']['score'] ?? 0 ); ?>/100</strong></td>
+										<td><?php echo esc_html( $row['metrics']['lcp']['display'] ?? '—' ); ?></td>
+										<td><?php echo esc_html( $row['metrics']['tbt']['display'] ?? '—' ); ?></td>
+										<td><?php echo esc_html( $row['metrics']['cls']['display'] ?? '—' ); ?></td>
+										<td><?php echo esc_html( $row['metrics']['ttfb']['display'] ?? '—' ); ?></td>
+									</tr>
+								<?php endforeach; ?>
+							</tbody>
+						</table>
+					<?php self::card_close(); ?>
+				<?php endif; ?>
+			</section>
+		</div>
+
+		<script>
+			(function () {
+				var nonce = <?php echo wp_json_encode( $nonce ); ?>;
+				var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+				var initialReport = <?php echo wp_json_encode( $latest ); ?>;
+
+				function escHtml(str) {
+					return String(str || '').replace(/[&<>"']/g, function (c) {
+						return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+					});
+				}
+
+				function postAjax(action, data, cb) {
+					var fd = new FormData();
+					fd.append('action', action);
+					fd.append('nonce', nonce);
+					Object.keys(data || {}).forEach(function (k) { fd.append(k, data[k]); });
+					fetch(ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+						.then(function (r) { return r.json(); })
+						.then(cb)
+						.catch(function (err) { cb({ success: false, data: { message: String(err) } }); });
+				}
+
+				function renderReport(rep) {
+					var box = document.getElementById('oro-psi-results');
+					if (!rep || !rep.metrics) { box.innerHTML = ''; return; }
+					var m = rep.metrics;
+					var scoreColor = m.score >= 90 ? '#15803d' : (m.score >= 50 ? '#b45309' : '#b91c1c');
+
+					var html = '<div class="oro-card"><div class="oro-card__head"><h2>Результат: ' + escHtml(rep.url) + ' (' + escHtml(rep.strategy) + ')</h2></div><div class="oro-card__body">';
+					html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;">';
+					html += '<div style="padding:12px 18px;border:1px solid #e2e8f0;border-radius:10px;min-width:110px;"><div style="font-size:12px;color:#64748b;">Performance</div><div style="font-size:26px;font-weight:700;color:' + scoreColor + ';">' + escHtml(m.score) + '/100</div></div>';
+					[['FCP', m.fcp], ['LCP', m.lcp], ['TBT', m.tbt], ['CLS', m.cls], ['TTFB', m.ttfb]].forEach(function (pair) {
+						html += '<div style="padding:12px 16px;border:1px solid #e2e8f0;border-radius:10px;min-width:100px;"><div style="font-size:12px;color:#64748b;">' + pair[0] + '</div><div style="font-size:18px;font-weight:600;">' + escHtml(pair[1] ? pair[1].display : '—') + '</div></div>';
+					});
+					html += '</div>';
+
+					if (rep.recommendations && rep.recommendations.length) {
+						html += '<h3 style="margin:14px 0 8px;">Рекомендации для Aliprofi Optimizer</h3><ul style="margin:0 0 16px 18px;">';
+						rep.recommendations.forEach(function (r) {
+							html += '<li style="margin-bottom:6px;"><strong>[' + escHtml(r.tab) + ']</strong> ' + escHtml(r.text) + '</li>';
+						});
+						html += '</ul>';
+					}
+
+					if (rep.cls_elements && rep.cls_elements.length) {
+						html += '<h3 style="margin:14px 0 8px;">Элементы, вызывающие сдвиг макета (CLS)</h3><table class="widefat striped" style="margin-bottom:16px;"><thead><tr><th>Вклад в CLS</th><th>Элемент (HTML)</th><th>Текст / метка</th></tr></thead><tbody>';
+						rep.cls_elements.forEach(function (ce) {
+							html += '<tr><td><strong>' + escHtml(ce.score) + '</strong></td><td><code style="word-break:break-all;">' + escHtml(ce.snippet) + '</code></td><td>' + escHtml(ce.label) + '</td></tr>';
+						});
+						html += '</tbody></table>';
+					}
+
+					if (rep.plugins && rep.plugins.length) {
+						html += '<h3 style="margin:14px 0 8px;">Проблемные плагины (по ресурсам PSI)</h3><table class="widefat striped" style="margin-bottom:16px;"><thead><tr><th>Плагин</th><th>Потери (мс)</th><th>Лишний вес (КБ)</th><th>Файлы</th></tr></thead><tbody>';
+						rep.plugins.forEach(function (p) {
+							html += '<tr><td><code>' + escHtml(p.slug) + '</code></td><td>' + escHtml(p.wasted_ms) + ' мс</td><td>' + escHtml(p.wasted_kb) + ' КБ</td><td><small>' + (p.files || []).map(escHtml).join('<br>') + '</small></td></tr>';
+						});
+						html += '</tbody></table>';
+					}
+
+					if (rep.dev_log) {
+						html += '<h3 style="margin:14px 0 8px;">Лог-задание для программиста / AI</h3>';
+						html += '<textarea id="oro-psi-devlog" rows="10" style="width:100%;font-family:monospace;font-size:12px;" readonly>' + escHtml(rep.dev_log) + '</textarea>';
+						html += '<p><button type="button" class="button" onclick="var t=document.getElementById(\'oro-psi-devlog\');t.select();document.execCommand(\'copy\');">Скопировать лог</button></p>';
+					}
+
+					html += '</div></div>';
+					box.innerHTML = html;
+				}
+
+				if (initialReport) { renderReport(initialReport); }
+
+				var btnKeys = document.getElementById('oro-psi-save-keys');
+				if (btnKeys) {
+					btnKeys.addEventListener('click', function () {
+						var st = document.getElementById('oro-psi-keys-status');
+						st.textContent = 'Сохранение...';
+						postAjax('aliprofi_psi_save_keys', {
+							psi_key: document.getElementById('oro-psi-key').value,
+							deepseek_key: document.getElementById('oro-deepseek-key').value
+						}, function (res) {
+							st.textContent = res.success ? res.data.message : ('Ошибка: ' + (res.data && res.data.message ? res.data.message : ''));
+						});
+					});
+				}
+
+				var btnRun = document.getElementById('oro-psi-run');
+				if (btnRun) {
+					btnRun.addEventListener('click', function () {
+						var st = document.getElementById('oro-psi-status');
+						btnRun.disabled = true;
+						st.textContent = 'Идёт замер Google PageSpeed (15–45 сек)...';
+						postAjax('aliprofi_psi_run', {
+							url: document.getElementById('oro-psi-url').value,
+							strategy: document.getElementById('oro-psi-strategy').value
+						}, function (res) {
+							btnRun.disabled = false;
+							if (res.success) {
+								st.textContent = 'Готово!';
+								renderReport(res.data);
+								var aiBtn = document.getElementById('oro-psi-ai-btn');
+								if (aiBtn) { aiBtn.disabled = false; }
+							} else {
+								st.textContent = 'Ошибка: ' + (res.data && res.data.message ? res.data.message : 'неизвестно');
+							}
+						});
+					});
+				}
+
+				var btnAi = document.getElementById('oro-psi-ai-btn');
+				if (btnAi) {
+					btnAi.addEventListener('click', function () {
+						var st = document.getElementById('oro-psi-status');
+						var aiBox = document.getElementById('oro-psi-ai-box');
+						var aiOut = document.getElementById('oro-psi-ai-output');
+						btnAi.disabled = true;
+						st.textContent = 'DeepSeek анализирует отчёт и ваши настройки...';
+						postAjax('aliprofi_psi_ai_analyze', { index: 0 }, function (res) {
+							btnAi.disabled = false;
+							if (res.success) {
+								st.textContent = 'AI-разбор готов.';
+								aiOut.textContent = res.data.analysis;
+								aiBox.style.display = '';
+							} else {
+								st.textContent = 'Ошибка AI: ' + (res.data && res.data.message ? res.data.message : 'неизвестно');
+							}
+						});
+					});
+				}
+
+				var btnClear = document.getElementById('oro-psi-clear-history');
+				if (btnClear) {
+					btnClear.addEventListener('click', function () {
+						if (!confirm('Очистить историю замеров PageSpeed?')) { return; }
+						postAjax('aliprofi_psi_clear_history', {}, function () { location.reload(); });
+					});
+				}
+			}());
+		</script>
+		<?php
 	}
 }

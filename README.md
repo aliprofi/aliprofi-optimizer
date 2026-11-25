@@ -41,6 +41,7 @@ WooCommerce, комментаторы, предпросмотр, 404, ленты
 | YouTube | `<div class="yt-facade">` с превью `hqdefault.jpg` и SVG-кнопкой; iframe с `autoplay=1` создаётся по клику/Enter/Space. |
 | Google Fonts | CSS и `.woff2` скачиваются в `wp-content/cache/aliprofi-optimizer-fonts/`, внешняя ссылка подменяется локальной, добавляется `font-display: swap`. Preload — по списку в настройках. |
 | База данных | Ревизии, авто-черновики, записи в корзине, спам и удалённые комментарии, транзиенты, `OPTIMIZE TABLE`. Счётчики, очистка по кнопке и WP-Cron daily/weekly/monthly. |
+| PageSpeed & AI | Анализ скорости мобильной и десктопной версии через Google PageSpeed Insights API v5 (Core Web Vitals, метрики FCP/LCP/CLS/TBT, аудит возможностей) и AI-диагностика узких мест через DeepSeek API с практическими рекомендациями. |
 
 ## 🛠 Требования
 
@@ -314,6 +315,7 @@ aliprofi-optimizer/
 
 ## 🗓 История версий
 
+- **1.5.0** — встроенный модуль «PageSpeed & AI»: аудит Core Web Vitals и метрик скорости через Google PageSpeed Insights API v5 (Mobile / Desktop) и интеллектуальный анализ узких мест с практическими рекомендациями через DeepSeek AI.
 - **1.4.2** — асинхронная загрузка CSS (`preload` + `onload` с `noscript`-фолбэком и списком исключений) и опция отключения MediaElement; обе выключены по умолчанию.
 - **1.4.1** — статус страничного кэша показывает точный путь к `wp-config.php` и готовую строку `define( 'WP_CACHE', true );`, если файл недоступен для записи PHP или константа уже упоминается в нём.
 - **1.4.0** — собственный страничный кэш в `wp-content/cache/aliprofi-optimizer/`: drop-in `advanced-cache.php`, автоматическое включение `WP_CACHE`, HTML до загрузки WordPress, TTL, исключения по пути, обход по кукам, очистка при изменении контента и прогрев через очередь. Чужой `advanced-cache.php` не перезаписывается.
